@@ -1,4 +1,5 @@
 import time
+import httpx
 import uuid
 from datetime import datetime, timezone
 
@@ -54,6 +55,7 @@ async def request_logging_middleware(request: Request, call_next):
 
     return response
 
+
 def _uptime_seconds() -> int:
     return int(time.time() - START_TIME)
 
@@ -108,7 +110,28 @@ async def submit(payload: SubmitRequest, request: Request):
         "event_type": payload.event_type,
     },
 )
-
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            await client.post(
+                "http://127.0.0.1:9000/ingest",
+                json={
+                    "service": SERVICE_NAME,
+                    "request_id": request_id,
+                    "event_name": "submit_received",
+                    "event_type": payload.event_type,
+                    "payload": payload.metadata,
+                },
+            )
+    except Exception as exc:
+        logger.error(
+            "audit_forward_failed",
+            extra={
+                "service": SERVICE_NAME,
+                "request_id": request_id,
+                "event_type": payload.event_type,
+                "error": str(exc),
+            },
+        )   
     return resp
 
 
