@@ -1,3 +1,0 @@
-{"log_id": "6ae48e5d-34dc-4621-af4e-9ef5013c1e67", "timestamp": "2026-03-03T14:47:17.443100+00:00", "service": "api-service", "request_id": "test-123", "event_name": "submit_received", "event_type": "demo", "payload": {"note": "week2"}}
-{"log_id": "a1bc9277-abe4-4b4f-94d5-636efa6454d8", "timestamp": "2026-03-05T14:20:38.471328+00:00", "service": "api-service", "request_id": "connect-test", "event_name": "submit_received", "event_type": "demo", "payload": {"note": "reachability"}}
-{"log_id": "526d28d4-5400-4530-9a70-509845ff16cf", "timestamp": "2026-03-05T14:25:01.422430+00:00", "service": "api-service", "request_id": "d76cc00e-b96c-444b-91cc-ebb6aabad643", "event_name": "submit_received", "event_type": "demo", "payload": {"source": "week2-connect"}}

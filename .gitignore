@@ -13,3 +13,6 @@ __pycache__/
 .DS_Store
 
 packages.microsoft.gpg
+# logging-service runtime data
+logging-service/data/*.jsonl
+logging-service/data/*.json1
