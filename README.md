@@ -1,116 +1,185 @@
-## Project Purpose
+Secure Audit Logging Platform
 
-“Secure cloud-native audit logging platform ( API service + structured logging).”
+A cloud-native audit logging platform designed to produce traceable, structured, and auditable event records across distributed services.
 
-## Deliverable
+The project demonstrates how application services can generate audit events and forward them to a dedicated logging microservice that records events in an append-only format.
 
-API runs locally
+This architecture reflects patterns used in production systems for:
 
-Endpoints exist: /health, /submit, /status
+Observability
 
-Structured JSON logs per request
+Compliance
 
-Request IDs included
+Security auditing
 
-Reproducible environment via .venv + requirements.txt
+Provenance tracking
 
-## API Contract (v0.1)
+It also serves as a foundation for research into secure logging for federated learning systems under the EU AI Act.
 
-Define:
+Architecture
+Client Request
+      │
+      ▼
+API Service (FastAPI)
+  - Handles requests
+  - Generates correlation ID
+  - Emits structured logs
+  - Forwards audit events
+      │
+      ▼
+Logging Service (FastAPI)
+  - Receives audit events
+  - Assigns server timestamp
+  - Generates log_id
+  - Stores records in append-only JSONL log
+      │
+      ▼
+Append-Only Audit Log
+(logging-service/data/audit-log.jsonl)
 
-GET /health
+This separation ensures that application services cannot directly manipulate audit records.
 
-##Purpose: Used by monitoring systems and later Kubernetes probes
 
- Response fields:
 
-  status (e.g., “ok”)
+##Current Features
+API Service
 
-  service (e.g., “api-service”)
+Provides operational endpoints and produces structured logs.
 
-  version (e.g., “0.1.0”)
+Endpoints:
 
-POST /submit
+Endpoint	Purpose
+/health	Service health check (for monitoring / Kubernetes probes)
+/status	Basic service metrics
+/submit	Simulated event submission
 
-##Purpose: Simulates events that generate audit logs (later forwarded to logging service)
+Key capabilities:
+Structured JSON logging
+Request correlation via request_id
+Middleware-based request logging
+Asynchronous forwarding of audit events
 
-Request fields:
 
-event_type (string)
+##Logging Service
 
-message (string)
+Dedicated service for receiving and storing audit events.
 
-metadata (object/dict, optional)
+Endpoints:
 
-Response fields:
+Endpoint	Purpose
+/health	Logging service health check
+/ingest	Accepts audit events from other services
+/logs	Returns recent stored events
 
-request_id (uuid)
+Each stored record contains:
+log_id
+timestamp
+service
+request_id
+event_name
+event_type
+payload
 
-accepted (boolean)
+Events are stored in JSON Lines format (.jsonl) using append-only writes.
 
-GET /status
 
-##Purpose: Operator visibility (basic service stats)
+##Structured Logging Schema (v0.1)
 
-Response fields:
+Each request processed by the API service emits structured logs with the following fields:
 
-uptime_seconds
+Required fields:
 
-request_count
-Step 4 — Define Structured Logging Schema (v0.1)
+timestamp
+level
+service
+request_id
+method
+path
+status_code
+duration_ms
 
-Required fields for every request log
+Recommended fields:
 
- timestamp (ISO-8601)
+client_ip
+user_agent
 
- level (INFO/WARN/ERROR)
+Endpoint-specific fields:
 
- service (“api-service”)
+event_type
 
- request_id (UUID per request)
+This schema is fixed early because schema drift breaks dashboards, queries, and audit validation in regulated environments.
 
- method
+Quickstart
+1. Clone the repository
+git clone https://github.com/jaymacsberg/secure-audit-logging-platform.git
+cd secure-audit-logging-platform
 
- path
+2. Start the Logging Service
+cd logging-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 9000
 
- status_code
+3. Start the API Service
+cd ../api-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 
- duration_ms
+4. Submit an event
+curl -X POST http://127.0.0.1:8000/submit \
+  -H "Content-Type: application/json" \
+  -d '{
+        "event_type":"demo",
+        "message":"hello",
+        "metadata":{"source":"quickstart"}
+      }'
 
-Recommended (if easy)
+5. Verify event was recorded
+curl http://127.0.0.1:9000/logs?n=5
+Why This Project Exists
 
- client_ip
+Modern AI and healthcare systems require provable traceability of system actions.
 
- user_agent
+A secure audit pipeline must guarantee:
+consistent event structure
+centralized event recording
+tamper-resistant storage
+traceable request lifecycle
 
-Endpoint-specific fields
+This project demonstrates the foundational architecture required to support such systems.
 
- For /submit logs:
 
-  event_type
 
-##Why we lock this now
+Roadmap
 
-Because when logs become “provenance records”, changing schema later breaks:
+Week 3
+Integrity protection for audit logs
+Hash chaining of log records
+Tamper detection
+Verification endpoint
 
- dashboards
+Week 4
+Operational hardening
+Docker containers
+Service networking
+Environment configuration
 
- queries
+Week 5
+Observability stack
+Metrics
+Prometheus integration
+Grafana dashboards
 
- alerts
+Week 6+
+Security and provenance extensions
+Event signing
+Secure log verification
+Federated learning provenance alignment
 
- audit validation
-
-In regulated environments, schema stability matters.
-
-##“Run Instructions”
-
-Run locally
-
- activate venv
-
- install requirements
-
- run uvicorn
-
- test endpoints
+Author
+Joshua Bolade
+PhD Researcher — Distributed AI Systems
+Focus: Secure logging, provenance, and trustworthy AI infrastructure
