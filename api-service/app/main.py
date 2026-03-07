@@ -1,3 +1,4 @@
+import os
 import time
 import httpx
 import uuid
@@ -11,6 +12,7 @@ from app.schemas import HealthResponse, StatusResponse, SubmitRequest, SubmitRes
 
 SERVICE_NAME = "api-service"
 VERSION = "0.1.0"
+LOGGING_SERVICE_URL = os.getenv("LOGGING_SERVICE_URL", "http://127.0.0.1:9000")
 
 # Process start time (used for uptime calculation)
 START_TIME = time.time()
@@ -113,7 +115,7 @@ async def submit(payload: SubmitRequest, request: Request):
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
             await client.post(
-                "http://127.0.0.1:9000/ingest",
+                f"{LOGGING_SERVICE_URL}/ingest",
                 json={
                     "service": SERVICE_NAME,
                     "request_id": request_id,

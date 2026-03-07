@@ -1,0 +1,20 @@
+services:
+  logging-service:
+    build:
+      context: ./logging-service
+    container_name: logging-service
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./logging-service/data:/app/data
+
+  api-service:
+    build:
+      context: ./api-service
+    container_name: api-service
+    ports:
+      - "8000:8000"
+    environment:
+      LOGGING_SERVICE_URL: http://logging-service:9000
+    depends_on:
+      - logging-service
