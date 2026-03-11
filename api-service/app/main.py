@@ -4,7 +4,10 @@ import httpx
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from fastapi.responses import PlainTextResponse
+
+from fastapi import BackgroundTasks, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.logging_config import get_logger
@@ -21,6 +24,52 @@ START_TIME = time.time()
 REQUEST_COUNT = 0
 
 logger = get_logger(SERVICE_NAME)
+
+REQUEST_COUNTER = Counter(
+    "api_requests_total",
+    "Total number of HTTP requests handled by the API service",
+    ["method", "path", "status_code"],
+)
+
+REQUEST_LATENCY = Histogram(
+    "api_request_latency_seconds",
+    "HTTP request latency in seconds",
+    ["method", "path"],
+)
+
+async def forward_audit_event(
+    request_id: str,
+    event_type: str | None,
+    metadata: dict | None,
+) -> None:
+    """
+    Sends an audit event to the logging service in the background.
+
+    This keeps the main request path fast and reduces coupling between
+    the API response path and the logging pipeline.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            await client.post(
+                f"{LOGGING_SERVICE_URL}/ingest",
+                json={
+                    "service": SERVICE_NAME,
+                    "request_id": request_id,
+                    "event_name": "submit_received",
+                    "event_type": event_type,
+                    "payload": metadata,
+                },
+            )
+    except Exception as exc:
+        logger.error(
+            "audit_forward_failed",
+            extra={
+                "service": SERVICE_NAME,
+                "request_id": request_id,
+                "event_type": event_type,
+                "error": str(exc),
+            },
+        )
 
 app = FastAPI(title=SERVICE_NAME, version=VERSION)
 
@@ -41,6 +90,8 @@ async def request_logging_middleware(request: Request, call_next):
 
     duration_ms = round((time.perf_counter() - start) * 1000, 3)
 
+    duration_seconds = duration_ms / 1000
+
     logger.info(
         "request_completed",
         extra={
@@ -54,6 +105,17 @@ async def request_logging_middleware(request: Request, call_next):
             "user_agent": request.headers.get("user-agent"),
         },
     )
+
+    REQUEST_COUNTER.labels(
+        method=request.method,
+        path=str(request.url.path),
+        status_code=str(response.status_code),
+    ).inc()
+
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        path=str(request.url.path),
+    ).observe(duration_seconds)
 
     return response
 
@@ -90,7 +152,11 @@ async def status(request: Request):
 
 
 @app.post("/submit", response_model=SubmitResponse)
-async def submit(payload: SubmitRequest, request: Request):
+async def submit(
+    payload: SubmitRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
     """
     Accepts an event and returns a request_id.
     In Week 2, events/logs will be forwarded to the dedicated logging microservice.
@@ -111,29 +177,13 @@ async def submit(payload: SubmitRequest, request: Request):
         "request_id": request_id,
         "event_type": payload.event_type,
     },
+)  
+    background_tasks.add_task(
+    forward_audit_event,
+    request_id,
+    payload.event_type,
+    payload.metadata,
 )
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            await client.post(
-                f"{LOGGING_SERVICE_URL}/ingest",
-                json={
-                    "service": SERVICE_NAME,
-                    "request_id": request_id,
-                    "event_name": "submit_received",
-                    "event_type": payload.event_type,
-                    "payload": payload.metadata,
-                },
-            )
-    except Exception as exc:
-        logger.error(
-            "audit_forward_failed",
-            extra={
-                "service": SERVICE_NAME,
-                "request_id": request_id,
-                "event_type": payload.event_type,
-                "error": str(exc),
-            },
-        )   
     return resp
 
 
@@ -156,3 +206,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         },
     )
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
+@app.get("/metrics")
+async def metrics():
+    return PlainTextResponse(
+        content=generate_latest().decode("utf-8"),
+        media_type=CONTENT_TYPE_LATEST,
+    )
