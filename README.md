@@ -151,33 +151,59 @@ traceable request lifecycle
 
 This project demonstrates the foundational architecture required to support such systems.
 
+# AWS EC2 Deployment
 
+The platform has been deployed on an AWS EC2 Ubuntu instance using Docker Compose.
+
+Services running on EC2:
+
+- API Service (FastAPI) — exposed on port 8000
+- Logging Service — exposed on port 9000
+- Prometheus — exposed on port 9090
+
+Deployment characteristics:
+
+- Multi-container deployment with Docker Compose
+- Publicly accessible API health endpoint
+- Audit event forwarding from API service to logging service
+- Prometheus scraping application metrics in the cloud
+
+Example cloud endpoints:
+
+- `http://<EC2_PUBLIC_IP>:8000/health`
+- `http://<EC2_PUBLIC_IP>:9000/logs?n=5`
+- `http://<EC2_PUBLIC_IP>:9090`
+
+This deployment demonstrates cloud-based service orchestration, remote container operations, and observability on AWS infrastructure.
 
 Roadmap
+# Progress So Far
 
-Week 3
-Integrity protection for audit logs
-Hash chaining of log records
-Tamper detection
-Verification endpoint
+## Week 1
+- Built API service with structured logging
+- Added request correlation IDs
+- Implemented middleware-based request logging
 
-Week 4
-Operational hardening
-Docker containers
-Service networking
-Environment configuration
+## Week 2
+- Built dedicated logging microservice
+- Added audit event forwarding from API service to logging service
+- Implemented append-only JSONL audit storage
 
-Week 5
-Observability stack
-Metrics
-Prometheus integration
-Grafana dashboards
+## Week 3
+- Containerized both services with Docker
+- Added Docker Compose for multi-service orchestration
+- Externalized service configuration with environment variables
 
-Week 6+
-Security and provenance extensions
-Event signing
-Secure log verification
-Federated learning provenance alignment
+## Week 4
+- Added Prometheus metrics instrumentation
+- Exposed `/metrics` endpoint
+- Added Prometheus scraping through Docker Compose
+
+## Week 5
+- Deployed the full platform on AWS EC2
+- Installed Docker and Docker Compose on Ubuntu server
+- Ran the platform remotely in the cloud
+- Verified public API, logging, and Prometheus access
 
 Author
 Joshua Bolade
